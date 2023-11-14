@@ -3,6 +3,37 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+enum GeneralTypes
+{
+    registerType,
+    memoryType,
+    immediateType,
+    segmentRegisterType
+};
+
+enum SpecificTypes
+{
+    eightBitRegister,
+    sixteenBitRegister,
+    eightBitMemory,
+    sixteenBitMemory,
+    eightBitImmediate,
+    sixteenBitImmediate,
+    segmentRegister
+};
+
+enum MoreDetails
+{
+    BXandSI,
+    BXandDI,
+    BPandSI,
+    BPandDI,
+    SI,
+    DI,
+    BPorDirect,
+    BX
+};
+
 enum ModValues
 {
     regToReg,
@@ -18,14 +49,29 @@ enum ModValues
 
 enum AddressingModes
 {
-    
+
     memoryModeNoDisplacement,
     memoryMode8bitDisplacement,
     memoryMode16bitDisplacement,
     registerMode,
-};  
+};
 
 typedef char *String;
+
+typedef struct type
+{
+
+    int generalType;
+    int specificType;
+    int moreDetails;
+    int addressingMode;
+} Type;
+
+typedef struct Operand
+{
+    String value;
+    Type type;
+} Operand;
 
 typedef struct
 {
@@ -33,16 +79,14 @@ typedef struct
     String code;
 } Map;
 
-
 String registers[] = {
     "ax", "bx", "cx", "dx", "al", "bl", "cl", "dl", "ah", "bh", "ch", "dh", "bp", "si", "di", "sp"};
 
 String SEXTENbitRegisters[] = {
     "ax", "bx", "cx", "dx", "bp", "si", "di", "sp"};
 
-String segments [] = {
-    "cs", "ds", "es", "ss"
-};
+String segments[] = {
+    "cs", "ds", "es", "ss"};
 
 bool isSEXTENbitRegister(String operand)
 {
@@ -71,9 +115,7 @@ Map REG[] = {
     {"bp", "101"},
     {"si", "110"},
     {"di", "111"},
-    {"sp", "100"}
-
-};
+    {"sp", "100"}};
 bool isOperandRegister(String operand, String registers[])
 {
     for (int i = 0; i < 16; i++)
@@ -95,11 +137,22 @@ bool isOperandMemory(String operand)
     return false;
 }
 
-bool isOperandImmediate(String operand, String registers[])
+bool isOperandSegmentRegister(String operand)
 {
-    return !isOperandRegister(operand, registers) && !isOperandMemory(operand);
+    for (int i = 0; i < 4; i++)
+    {
+        if (strcmp(operand, segments[i]) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
+bool isOperandImmediate(String operand, String registers[])
+{
+    return !isOperandRegister(operand, registers) && !isOperandMemory(operand) && !isOperandSegmentRegister(operand);
+}
 String MovInstruction(String operand1, String operand2, String registers[])
 {
     String opcode[] = {
@@ -123,7 +176,7 @@ String MovInstruction(String operand1, String operand2, String registers[])
     }
     else if (isOperandImmediate(operand2, registers) && isOperandMemory(operand1))
     {
-        mod = ImmToRegM; 
+        mod = ImmToRegM;
     }
     else if (isOperandMemory(operand1) && strcmp(operand2, "ax") == 0)
     {
@@ -133,11 +186,11 @@ String MovInstruction(String operand1, String operand2, String registers[])
     {
         mod = AccToMem;
     }
-    else if (isSEXTENbitRegister(operand1) && isOperandMemory(operand2))
+    else if (isOperandSegmentRegister(operand1) && isOperandMemory(operand2))
     {
         mod = rmToSreg;
     }
-    else if (isOperandMemory(operand1) && isSEXTENbitRegister(operand2))
+    else if (isOperandMemory(operand1) && isOperandSegmentRegister(operand2))
     {
         mod = SregTorm;
     }
@@ -188,13 +241,13 @@ String MovInstruction(String operand1, String operand2, String registers[])
     {
 
     case regToReg:
-        D = "1";
+        strcpy(D, "1");
         break;
     case regToMem:
-        D = "0";
+        strcpy(D, "0");
         break;
     default:
-        D = "";
+        strcpy(D, "");
         break;
     }
 
@@ -202,7 +255,7 @@ String MovInstruction(String operand1, String operand2, String registers[])
 
     if (mod == SregTorm || mod == rmToSreg)
     {
-        W = "";
+        strcpy(W, "");
     }
     else if (isSEXTENbitRegister(operand1) || isSEXTENbitRegister(operand2))
     {
@@ -212,14 +265,27 @@ String MovInstruction(String operand1, String operand2, String registers[])
     {
         strcpy(W, "0");
     }
+
     String mode = malloc(sizeof(char) * 3);
     String reg = malloc(4 * sizeof(char));
     String rm = malloc(4 * sizeof(char));
 
+    if (mod == regToReg || mod == regToMem || mod == memToReg || mod == SregTorm || mod == rmToSreg)
+    {
+        if (mod == regToReg)
+        {
+            strcpy(mode, "11");
+        }
+        else if (mod == regToMem)
+        {
+        }
+    }
+    else
+    {
+        strcpy(mode, "");
+    }
     return MovOpcode;
 }
-
-
 
 void readSentence(String sentence)
 {
@@ -287,12 +353,238 @@ String selectOperation(String sentence)
     return operation;
 }
 
+void checkImmidiateType(Operand *operand)
+{
+    if (operand->value[strlen(operand->value) - 1] == 'h' && strlen(operand->value) > 3)
+    {
+        operand->type.specificType = sixteenBitImmediate;
+    }
+    else if (operand->value[strlen(operand->value) - 1] == 'h')
+    {
+        operand->type.specificType = eightBitImmediate;
+    }
+    else if (atoi(operand->value) > 255)
+    {
+        operand->type.specificType = sixteenBitImmediate;
+    }
+    else
+    {
+        operand->type.specificType = eightBitImmediate;
+    }
+}
 
+void checkMemoryType(Operand *operand)
+{
+    int i = 1; // we are sure that the first character is '['
+    while (operand->value[i] != ']' && operand->value[i] != 'b' && operand->value[i] != 's' && operand->value[i] != 'd')
+    {
+        i++;
+    }
 
+    if (operand->value[i] == ']')
+    {
+        if (operand->value[i - 1] == 'h' && strlen(operand->value) > 5)
+        {
+            operand->type.specificType = sixteenBitMemory;
+        }
+        else if (operand->value[i - 1] == 'h')
+        {
+            operand->type.specificType = eightBitMemory;
+        }
+        else if (operand->value[i - 1] != 'h')
+        {
+            String number = (String)malloc(6 * sizeof(char));
+            strncpy(number, operand->value + 1, i - 2);
+            if (atoi(number) > 255)
+            {
+                operand->type.specificType = sixteenBitMemory;
+            }
+            else
+            {
+                operand->type.specificType = eightBitMemory;
+            }
+        }
+        operand->type.moreDetails = BPorDirect;
+    }
+    else if (strstr(operand->value, "bx") != NULL && strstr(operand->value, "si") != NULL)
+    {
+        operand->type.moreDetails = BXandSI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "bx") != NULL && strstr(operand->value, "di") != NULL)
+    {
+        operand->type.moreDetails = BXandDI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "bp") != NULL && strstr(operand->value, "si") != NULL)
+    {
+        operand->type.moreDetails = BPandSI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "bp") != NULL && strstr(operand->value, "di") != NULL)
+    {
+        operand->type.moreDetails = BPandDI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "si") != NULL)
+    {
+        operand->type.moreDetails = SI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "di") != NULL)
+    {
+        operand->type.moreDetails = DI;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "bp") != NULL)
+    {
+        operand->type.moreDetails = BPorDirect;
+        operand->type.specificType = sixteenBitMemory;
+    }
+    else if (strstr(operand->value, "bx") != NULL)
+    {
+        operand->type.moreDetails = BX;
+        operand->type.specificType = sixteenBitMemory;
+    }
+}
+
+void setValue(Operand *operand, String value)
+{
+    operand->value = value;
+}
+
+void setGeneralType(Operand *operand)
+{
+    if (isOperandRegister(operand->value, registers))
+    {
+        operand->type.generalType = registerType;
+    }
+    else if (isOperandMemory(operand->value))
+    {
+        operand->type.generalType = memoryType;
+    }
+    else if (isOperandImmediate(operand->value, registers))
+    {
+        operand->type.generalType = immediateType;
+    }
+    else if (isOperandSegmentRegister(operand->value))
+    {
+        operand->type.generalType = segmentRegisterType;
+    }
+}
+
+void setSpecificType(Operand *operand)
+{
+    if (isOperandRegister(operand->value, registers))
+    {
+        if (isSEXTENbitRegister(operand->value))
+        {
+            operand->type.specificType = sixteenBitRegister;
+        }
+        else
+        {
+            operand->type.specificType = eightBitRegister;
+        }
+    }
+    else if (isOperandSegmentRegister(operand->value))
+    {
+        operand->type.specificType = segmentRegister;
+    }
+    else if (isOperandImmediate(operand->value, registers))
+    {
+        checkImmidiateType(operand);
+    }
+    else if (isOperandMemory(operand->value))
+    {
+        checkMemoryType(operand);
+    }
+}
+
+void setAddressingMode(Operand *operand)
+{
+    if (operand->type.generalType == registerType)
+    {
+        operand->type.addressingMode = registerMode;
+        return;
+    }
+
+    
+
+    if (operand->type.moreDetails == BXandSI)
+    {
+        int i = 1;
+        if(operand->value[i]!= 'b' || operand->value[i]!= 's')
+        {
+            int count = 0 ;
+            while(operand->value[i] != '+')
+            {
+                count++;
+                i++;
+            }
+            
+        }
+
+    }
+}
+
+void setMovInstructionMod(Operand *operand1, Operand *operand2, int *mode)
+{
+    if (operand1->type.generalType == registerType && operand2->type.generalType == registerType)
+    {
+        *mode = regToReg;
+    }
+    else if (operand1->type.generalType == registerType && operand2->type.generalType == memoryType)
+    {
+        *mode = memToReg;
+    }
+    else if (operand1->type.generalType == memoryType && operand2->type.generalType == registerType)
+    {
+        *mode = regToMem;
+    }
+    else if (operand1->type.generalType == registerMode && operand2->type.generalType == immediateType)
+    {
+        *mode = ImmToReg;
+    }
+    else if (operand1->type.generalType == segmentRegisterType && operand2->type.generalType == memoryType)
+    {
+        *mode = rmToSreg;
+    }
+    else if (operand1->type.generalType == memoryType && operand2->type.generalType == segmentRegisterType)
+    {
+        *mode = SregTorm;
+    }
+    else if (operand1->type.generalType == registerType && operand2->type.generalType == segmentRegisterType)
+    {
+        *mode = SregTorm;
+    }
+    else if (operand1->type.generalType == segmentRegisterType && operand2->type.generalType == registerType)
+    {
+        *mode = rmToSreg;
+    }
+    else if (operand1->type.generalType == memoryType && operand2->type.generalType == immediateType)
+    {
+        *mode = ImmToRegM;
+    }
+}
+
+void setModValue(Operand *operand1, Operand *operand2, int *mode, String *MOD)
+{
+    if (*mode == regToReg || *mode == regToMem || *mode == memToReg || *mode == SregTorm || *mode == rmToSreg)
+    {
+        if (*mode == regToReg)
+        {
+            strcpy(*MOD, "11");
+        }
+    }
+    else
+    {
+        strcpy(*MOD, "");
+    }
+}
 
 int main()
 {
-    
+
     printf("Enter an instruction: ");
     String sentence = (String)malloc(100 * sizeof(char));
     readSentence(sentence);
@@ -301,10 +593,23 @@ int main()
     String firstOperand = getFirstOperand(sentence);
     String secondOperand = getSecondOperand(sentence);
 
-    String result = MovInstruction(firstOperand, secondOperand, registers);
+    Operand *operand1 = malloc(sizeof(Operand));
+    Operand *operand2 = malloc(sizeof(Operand));
 
-    printf("result: %s\n", result);
+    setValue(operand1, firstOperand);
+    setValue(operand2, secondOperand);
 
-    free(sentence);
+    setGeneralType(operand1);
+    setGeneralType(operand2);
+
+    setSpecificType(operand1);
+    setSpecificType(operand2);
+
+    setAddressingMode(operand1);
+    setAddressingMode(operand2);
+
+    printf("%d\n", operand1->type.addressingMode);
+    printf("%d\n", operand2->type.addressingMode);
+
     return 0;
 }
