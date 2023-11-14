@@ -12,7 +12,7 @@ typedef struct
 } Map;
 
 Map operationMap[] = {
-    {"mov", "100001"}};
+    {"mov", "100010"}};
 
 String registers[] = {
     "ax", "bx", "cx", "dx", "al", "bl", "cl", "dl", "ah", "bh", "ch", "dh", "bp", "si", "di", "sp"};
