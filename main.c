@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-enum GeneralTypes
+enum OperandType
 {
     registerType,
     memoryType,
@@ -11,18 +11,16 @@ enum GeneralTypes
     segmentRegisterType
 };
 
-enum SpecificTypes
+enum TypeDetails
 {
     eightBitRegister,
     sixteenBitRegister,
-    eightBitMemory,
-    sixteenBitMemory,
     eightBitImmediate,
     sixteenBitImmediate,
     segmentRegister
 };
 
-enum MoreDetails
+enum RegistersInvolvedInMemory
 {
     BXandSI,
     BXandDI,
@@ -34,7 +32,7 @@ enum MoreDetails
     BX
 };
 
-enum ModValues
+enum OperationType
 {
     regToReg,
     regToMem,
@@ -61,10 +59,12 @@ typedef char *String;
 typedef struct type
 {
 
-    int generalType;
-    int specificType;
-    int moreDetails;
+    int OperandType;
+    int TypeDetails;
+    int RegistersInvlovedInMemory;
     int addressingMode;
+    String dataOrDisp;
+    String Disp;
 } Type;
 
 typedef struct Operand
@@ -77,58 +77,65 @@ typedef struct
 {
     String operation;
     String code;
-} Map;
-
-String registers[] = {
-    "ax", "bx", "cx", "dx", "al", "bl", "cl", "dl", "ah", "bh", "ch", "dh", "bp", "si", "di", "sp"};
-
-String SEXTENbitRegisters[] = {
-    "ax", "bx", "cx", "dx", "bp", "si", "di", "sp"};
-
-String segments[] = {
-    "cs", "ds", "es", "ss"};
-
-bool isSEXTENbitRegister(String operand)
+} StringMap;
+typedef struct
 {
-    for (int i = 0; i < 8; i++)
-    {
-        if (strcmp(operand, SEXTENbitRegisters[i]) == 0)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-Map REG[] = {
-    {"ax", "000"},
-    {"bx", "001"},
-    {"cx", "010"},
-    {"dx", "011"},
-    {"al", "000"},
-    {"bl", "001"},
-    {"cl", "010"},
-    {"dl", "011"},
-    {"ah", "100"},
-    {"bh", "101"},
-    {"ch", "110"},
-    {"dh", "111"},
-    {"bp", "101"},
-    {"si", "110"},
-    {"di", "111"},
-    {"sp", "100"}};
-bool isOperandRegister(String operand, String registers[])
-{
-    for (int i = 0; i < 16; i++)
-    {
-        if (strcmp(operand, registers[i]) == 0)
-        {
-            return true;
-        }
-    }
-    return false;
-}
+    int RegistersInvolved;
+    String code;
+} intMap;
 
-bool isOperandMemory(String operand)
+typedef struct Instruction
+{
+    String name;
+    Operand operand1;
+    Operand operand2;
+
+} Instruction;
+
+// ------ checking  --------------
+String sixTeenregisters[] = {"AX", "BX", "CX", "DX", "SI", "DI", "SP", "BP"};
+String eightregisters[] = {"AL", "BL", "CL", "DL", "AH", "BH", "CH", "DH"};
+String segmentRegisters[] = {"CS", "DS", "SS", "ES"};
+StringMap reg[] = {
+    {"AX", "000"},
+    {"BX", "001"},
+    {"CX", "010"},
+    {"DX", "011"},
+    {"AL", "000"},
+    {"BL", "001"},
+    {"CL", "010"},
+    {"DL", "011"},
+    {"AH", "100"},
+    {"BH", "101"},
+    {"CH", "110"},
+    {"DH", "111"},
+    {"SP", "100"},
+    {"BP", "101"},
+    {"SI", "110"},
+    {"DI", "111"},
+
+};
+
+intMap rm[] = {
+    {BXandSI, "000"},
+    {BXandDI, "001"},
+    {BPandSI, "010"},
+    {BPandDI, "011"},
+    {SI, "100"},
+    {DI, "101"},
+    {BPorDirect, "110"},
+    {BX, "111"},
+
+};
+
+StringMap sr[] = {
+    {"ES", "00"},
+    {"CS", "01"},
+    {"SS", "10"},
+    {"DS", "11"},
+};
+
+bool isMemoryType(String operand)
 {
     if (operand[0] == '[' && operand[strlen(operand) - 1] == ']')
     {
@@ -137,127 +144,536 @@ bool isOperandMemory(String operand)
     return false;
 }
 
-bool isOperandSegmentRegister(String operand)
+bool isRegisterType(String operand)
 {
-    for (int i = 0; i < 4; i++)
+    int i = 0;
+    while (i < 8)
     {
-        if (strcmp(operand, segments[i]) == 0)
+        if (strcmp(operand, sixTeenregisters[i]) == 0)
         {
             return true;
         }
+        i++;
+    }
+    i = 0;
+    while (i < 8)
+    {
+        if (strcmp(operand, eightregisters[i]) == 0)
+        {
+            return true;
+        }
+        i++;
     }
     return false;
 }
 
-bool isOperandImmediate(String operand, String registers[])
+bool isSegmentRegister(String operand)
 {
-    return !isOperandRegister(operand, registers) && !isOperandMemory(operand) && !isOperandSegmentRegister(operand);
+    int i = 0;
+    while (i < 4)
+    {
+        if (strcmp(operand, segmentRegisters[i]) == 0)
+        {
+            return true;
+        }
+        i++;
+    }
+    return false;
 }
-String MovInstruction(String operand1, String operand2, String registers[])
+
+bool isImmediate(String oprand)
 {
-    String opcode[] = {
-        "100010", "1100011", "1011", "1010000", "1010001", "10001110", "10001100"};
-    int mod;
-    if (isOperandRegister(operand1, registers) && isOperandRegister(operand2, registers))
+    return !isRegisterType(oprand) && !isMemoryType(oprand) && !isSegmentRegister(oprand);
+}
+
+bool isSubStringExist(String sub, String super)
+{
+    return strstr(super, sub) != NULL;
+}
+
+String DecToHex(long dec)
+{
+    String hex = malloc(sizeof(char) * 5);
+    int i = 0;
+    while (dec != 0)
     {
-        mod = regToReg;
+        int temp = 0;
+        temp = dec % 16;
+        if (temp < 10)
+        {
+            hex[i] = temp + 48;
+            i++;
+        }
+        else
+        {
+            hex[i] = temp + 55;
+            i++;
+        }
+        dec = dec / 16;
     }
-    else if (isOperandRegister(operand1, registers) && isOperandMemory(operand2))
+    hex[i] = '\0';
+
+    return hex;
+}
+// ------------------------------------------------------//
+
+String getInstructionType(String operation)
+{
+    int i = 0;
+    while (i < strlen(operation) && operation[i] == ' ')
     {
-        mod = regToMem;
+        i++;
     }
-    else if (isOperandMemory(operand1) && isOperandRegister(operand2, registers))
+    if (i == strlen(operation))
     {
-        mod = memToReg;
+        printf("Error: No operation found\n");
+        exit(0);
     }
-    else if (isOperandImmediate(operand2, registers) && isOperandRegister(operand1, registers))
+    String instructionType = (String)malloc(sizeof(char) * 10);
+    int j = 0;
+    while (i < strlen(operation) && operation[i] != ' ')
     {
-        mod = ImmToReg;
+        instructionType[j++] = operation[i++];
     }
-    else if (isOperandImmediate(operand2, registers) && isOperandMemory(operand1))
+    instructionType[j] = '\0';
+
+    return instructionType;
+}
+
+String getFirstOperand(String operation)
+{
+    int i = strlen(getInstructionType(operation));
+
+    while (i < strlen(operation) && (operation[i] == ' '))
     {
-        mod = ImmToRegM;
+        i++;
     }
-    else if (isOperandMemory(operand1) && strcmp(operand2, "ax") == 0)
+
+    if (i == strlen(operation))
     {
-        mod = MemToAcc;
-    }
-    else if (strcmp(operand1, "ax") == 0 && isOperandMemory(operand2))
-    {
-        mod = AccToMem;
-    }
-    else if (isOperandSegmentRegister(operand1) && isOperandMemory(operand2))
-    {
-        mod = rmToSreg;
-    }
-    else if (isOperandMemory(operand1) && isOperandSegmentRegister(operand2))
-    {
-        mod = SregTorm;
-    }
-    else
-    {
-        printf("Invalid operands\n");
+        printf("Error: No operand found\n");
         exit(0);
     }
 
-    String MovOpcode = malloc(sizeof(char) * 8);
-    switch (mod)
+    String firstOperand = (String)malloc(sizeof(char) * 10);
+    int j = 0;
+    while (i < strlen(operation) && (operation[i] != ' ' && operation[i] != ','))
     {
-    case regToReg:
-        strcpy(MovOpcode, opcode[0]);
-        break;
-    case regToMem:
-        strcpy(MovOpcode, opcode[0]);
-        break;
-    case memToReg:
-        strcpy(MovOpcode, opcode[0]);
-        break;
-    case ImmToRegM:
-        strcpy(MovOpcode, opcode[1]);
-        break;
-    case ImmToReg:
-        strcpy(MovOpcode, opcode[2]);
-        break;
-    case MemToAcc:
-        strcpy(MovOpcode, opcode[3]);
-        break;
-    case AccToMem:
-        strcpy(MovOpcode, opcode[4]);
-        break;
-    case rmToSreg:
-        strcpy(MovOpcode, opcode[5]);
-        break;
-    case SregTorm:
-        strcpy(MovOpcode, opcode[6]);
-        break;
-    default:
+        firstOperand[j++] = operation[i++];
+    }
+    firstOperand[j] = '\0';
+    return firstOperand;
+}
 
-        break;
+String getSecondOperand(String operation)
+{
+    int i = strlen(getInstructionType(operation));
+    while (i < strlen(operation) && operation[i] == ' ')
+    {
+        i++;
     }
 
-    String D = malloc(sizeof(char) * 2);
-
-    switch (mod)
+    if (i == strlen(operation))
     {
-
-    case regToReg:
-        strcpy(D, "1");
-        break;
-    case regToMem:
-        strcpy(D, "0");
-        break;
-    default:
-        strcpy(D, "");
-        break;
+        printf("Error: No operand found\n");
+        exit(0);
     }
 
+    i += strlen(getFirstOperand(operation));
+
+    while (i < strlen(operation) && (operation[i] == ' ' || operation[i] == ','))
+    {
+        i++;
+    }
+
+    String secondOperand = (String)malloc(sizeof(char) * 10);
+    int j = 0;
+    while (i < strlen(operation) && (operation[i] != ' ' && operation[i] != ','))
+    {
+        secondOperand[j++] = operation[i++];
+    }
+
+    secondOperand[j] = '\0';
+    return secondOperand;
+}
+
+void setType(Operand *Operand)
+{
+    if (isRegisterType(Operand->value))
+    {
+        Operand->type.OperandType = registerType;
+        return;
+    }
+    if (isMemoryType(Operand->value))
+    {
+        Operand->type.OperandType = memoryType;
+        return;
+    }
+    if (isImmediate(Operand->value))
+    {
+        Operand->type.OperandType = immediateType;
+        return;
+    }
+    if (isSegmentRegister(Operand->value))
+    {
+        Operand->type.OperandType = segmentRegisterType;
+        return;
+    }
+}
+
+void setTypeDetails(Operand *Operand)
+{
+    if (isRegisterType(Operand->value))
+    {
+        if (Operand->value[1] == 'X')
+        {
+            Operand->type.TypeDetails = sixteenBitRegister;
+            return;
+        }
+        Operand->type.TypeDetails = eightBitRegister;
+        return;
+    }
+    if (isImmediate(Operand->value))
+    {
+        if (strlen(Operand->value) <= 3)
+        {
+            Operand->type.TypeDetails = eightBitImmediate;
+            return;
+        }
+        Operand->type.TypeDetails = sixteenBitImmediate;
+        return;
+    }
+
+    if (isSegmentRegister(Operand->value))
+    {
+        Operand->type.TypeDetails = segmentRegister;
+        return;
+    }
+    else
+    {
+        Operand->type.TypeDetails = -1;
+    }
+}
+
+void SetAddressingMode(Operand *Operand)
+{
+    int counter = 0;
+    int i = strlen(Operand->value) - 2;
+
+    if (Operand->type.OperandType == memoryType)
+    {
+        if (Operand->value[i] != 'H')
+        {
+            Operand->type.addressingMode = memoryModeNoDisplacement;
+            return;
+        }
+        else
+        {
+            while (i >= 0 && Operand->value[i] != '+')
+            {
+                counter++;
+                i--;
+            }
+
+            if (i == -1)
+            {
+                Operand->type.addressingMode = memoryModeNoDisplacement;
+                return;
+            }
+            else if (counter <= 3)
+            {
+                Operand->type.addressingMode = memoryMode8bitDisplacement;
+                return;
+            }
+            else
+            {
+                Operand->type.addressingMode = memoryMode16bitDisplacement;
+                return;
+            }
+        }
+    }
+    if (Operand->type.OperandType == registerType)
+    {
+        Operand->type.addressingMode = registerMode;
+        return;
+    }
+    else
+    {
+        Operand->type.addressingMode = -1;
+    }
+}
+
+int setOperationType(Operand *Operand1, Operand *Operand2)
+{
+    if (Operand1->type.OperandType == registerType && Operand2->type.OperandType == registerType)
+    {
+        return regToReg;
+    }
+    if (Operand1->type.OperandType == registerType && Operand2->type.OperandType == memoryType)
+    {
+        if (strcmp(Operand1->value, "AX") == 0 || strcmp(Operand1->value, "AL") == 0)
+        {
+            return MemToAcc;
+        }
+        return memToReg;
+    }
+    if (Operand1->type.OperandType == memoryType && Operand2->type.OperandType == registerType)
+    {
+        if (strcmp(Operand2->value, "AX") == 0 || strcmp(Operand2->value, "AL") == 0)
+        {
+            return AccToMem;
+        }
+        return regToMem;
+    }
+    if (Operand2->type.OperandType == immediateType && (Operand1->type.OperandType == registerType || Operand1->type.OperandType == memoryType))
+    {
+        if (Operand1->type.OperandType == registerType)
+        {
+            return ImmToReg;
+        }
+        return ImmToRegM;
+    }
+    if ((Operand1->type.OperandType == memoryType || Operand1->type.OperandType == registerType) && Operand2->type.OperandType == segmentRegisterType)
+    {
+        return SregTorm;
+    }
+    if (Operand1->type.OperandType == segmentRegisterType && (Operand2->type.OperandType == memoryType || Operand2->type.OperandType == registerType))
+    {
+        return rmToSreg;
+    }
+    else
+    {
+        printf("Error: Operation type not found\n");
+        exit(0);
+    }
+}
+void setRegistersInvolvedInMemory(Operand *Operand)
+{
+    if (Operand->type.OperandType == memoryType)
+    {
+        if (isSubStringExist("BX", Operand->value) && isSubStringExist("SI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BXandSI;
+            return;
+        }
+        if (isSubStringExist("BX", Operand->value) && isSubStringExist("DI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BXandDI;
+            return;
+        }
+        if (isSubStringExist("BP", Operand->value) && isSubStringExist("SI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BPandSI;
+            return;
+        }
+        if (isSubStringExist("BP", Operand->value) && isSubStringExist("DI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BPandDI;
+            return;
+        }
+        if (isSubStringExist("SI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = SI;
+            return;
+        }
+        if (isSubStringExist("DI", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = DI;
+            return;
+        }
+        if (isSubStringExist("BP", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BPorDirect;
+            return;
+        }
+        if (isSubStringExist("BX", Operand->value))
+        {
+            Operand->type.RegistersInvlovedInMemory = BX;
+            return;
+        }
+        else
+        {
+            Operand->type.RegistersInvlovedInMemory = BPorDirect;
+        }
+    }
+    else
+    {
+        Operand->type.RegistersInvlovedInMemory = -1;
+    }
+}
+
+void setData(Operand *Operand)
+{
+    String Low = malloc(sizeof(3));
+    String High = malloc(sizeof(3));
+
+    String all = malloc(sizeof(5));
+
+    if (Operand->type.OperandType == immediateType)
+    {
+        if (Operand->type.TypeDetails == eightBitImmediate)
+        {
+            Low[0] = Operand->value[0];
+            Low[1] = Operand->value[1];
+            Low[2] = '\0';
+            strcpy(High, "");
+        }
+        else
+        {
+            High[0] = Operand->value[0];
+            High[1] = Operand->value[1];
+            High[2] = '\0';
+            Low[0] = Operand->value[2];
+            Low[1] = Operand->value[3];
+            Low[2] = '\0';
+        }
+    }
+    else
+    {
+        Operand->type.dataOrDisp = "";
+        return;
+    }
+    strcpy(all, Low);
+    strcat(all, High);
+    Operand->type.dataOrDisp = all;
+}
+
+void setDisp(Operand *Operand)
+{
+    String Disp = malloc(sizeof(5));
+    String Low = malloc(sizeof(3));
+    String High = malloc(sizeof(3));
+
+    if (Operand->type.OperandType == memoryType)
+    {
+        if (Operand->type.RegistersInvlovedInMemory == BPorDirect)
+        {
+            int i = 1;
+            int counter = 0;
+            while (Operand->value[i++] != 'H')
+            {
+                counter++;
+            }
+
+            if (counter <= 2)
+            {
+                Low[0] = Operand->value[1];
+                Low[1] = Operand->value[2];
+                Low[2] = '\0';
+                strcpy(High, "");
+            }
+
+            else
+            {
+                High[0] = Operand->value[1];
+                High[1] = Operand->value[2];
+                High[2] = '\0';
+                Low[0] = Operand->value[3];
+                Low[1] = Operand->value[4];
+                Low[2] = '\0';
+            }
+        }
+        else if (Operand->type.addressingMode != memoryModeNoDisplacement)
+        {
+            int i = strlen(Operand->value) - 2;
+            while (i > 0 && Operand->value[i] != '+')
+            {
+                i--;
+            }
+            if (i != 0)
+            {
+                int j = 0;
+                while (i < strlen(Operand->value) - 2)
+                {
+                    Disp[j++] = Operand->value[++i];
+                }
+                Disp[j] = '\0';
+                if (strlen(Disp) <= 2)
+                {
+                    Low[0] = Disp[0];
+                    Low[1] = Disp[1];
+                    Low[2] = '\0';
+                    strcpy(High, "");
+                }
+                else
+                {
+                    High[0] = Disp[0];
+                    High[1] = Disp[1];
+                    High[2] = '\0';
+                    Low[0] = Disp[2];
+                    Low[1] = Disp[3];
+                    Low[2] = '\0';
+                }
+            }
+        }
+        else
+        {
+            Operand->type.Disp = "";
+            return;
+        }
+    }
+    else
+    {
+        Operand->type.Disp = "";
+        return;
+    }
+    strcpy(Disp, Low);
+    strcat(Disp, High);
+    Operand->type.Disp = Disp;
+}
+
+String getRegisterCode(String value)
+{
+    int i = 0;
+    while (i < 16)
+    {
+        if (strcmp(value, reg[i].operation) == 0)
+        {
+            return reg[i].code;
+        }
+        i++;
+    }
+    return NULL;
+}
+
+String getRMcode(Operand Operand)
+{
+
+    int i = 0;
+    while (i < 8)
+    {
+        if (Operand.type.RegistersInvlovedInMemory == rm[i].RegistersInvolved)
+        {
+            return rm[i].code;
+        }
+        i++;
+    }
+    return NULL;
+}
+
+String getSregCode(String value)
+{
+    int i = 0;
+    while (i < 4)
+    {
+        if (strcmp(value, sr[i].operation) == 0)
+        {
+            return sr[i].code;
+        }
+        i++;
+    }
+    return NULL;
+}
+
+String regToreg(Operand op1, Operand op2)
+{
     String W = malloc(sizeof(char) * 2);
+    String D = malloc(sizeof(char) * 2);
+    String MOD = malloc(sizeof(char) * 3);
+    String reg = malloc(sizeof(char) * 4);
+    String rm = malloc(sizeof(char) * 4);
 
-    if (mod == SregTorm || mod == rmToSreg)
-    {
-        strcpy(W, "");
-    }
-    else if (isSEXTENbitRegister(operand1) || isSEXTENbitRegister(operand2))
+    if (op1.type.TypeDetails == sixteenBitRegister)
     {
         strcpy(W, "1");
     }
@@ -266,350 +682,423 @@ String MovInstruction(String operand1, String operand2, String registers[])
         strcpy(W, "0");
     }
 
-    String mode = malloc(sizeof(char) * 3);
-    String reg = malloc(4 * sizeof(char));
-    String rm = malloc(4 * sizeof(char));
+    strcpy(D, "1");
 
-    if (mod == regToReg || mod == regToMem || mod == memToReg || mod == SregTorm || mod == rmToSreg)
+    strcpy(MOD, "11");
+
+    strcpy(reg, getRegisterCode(op1.value));
+    strcpy(rm, getRegisterCode(op2.value));
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "100010");
+    strcat(code, D);
+    strcat(code, W);
+    strcat(code, MOD);
+    strcat(code, reg);
+    strcat(code, rm);
+
+    free(W);
+    free(D);
+    free(MOD);
+    free(reg);
+    free(rm);
+    return code;
+}
+String regTomem(Operand op1, Operand op2)
+{
+    String W = malloc(sizeof(char) * 2);
+    String D = malloc(sizeof(char) * 2);
+    String MOD = malloc(sizeof(char) * 3);
+    String reg = malloc(sizeof(char) * 4);
+    String rm = malloc(sizeof(char) * 4);
+
+    if (op2.type.TypeDetails == sixteenBitRegister)
     {
-        if (mod == regToReg)
-        {
-            strcpy(mode, "11");
-        }
-        else if (mod == regToMem)
-        {
-        }
+        strcpy(W, "1");
     }
     else
     {
-        strcpy(mode, "");
+        strcpy(W, "0");
     }
-    return MovOpcode;
-}
 
-void readSentence(String sentence)
-{
-    fgets(sentence, 100, stdin);
-    sentence[strcspn(sentence, "\n")] = '\0';
-}
+    strcpy(D, "0");
 
-String getFirstOperand(String sentence)
-{
-    String operand = (String)malloc(7 * sizeof(char));
-    sscanf(sentence, "%*s %s", operand);
-    return operand;
-}
+    switch (op1.type.addressingMode)
+    {
+    case memoryModeNoDisplacement:
+        strcpy(MOD, "00");
+        break;
 
-String getSecondOperand(String sentence)
-{
-    String operand = (String)malloc(7 * sizeof(char));
-    int i = 0;
-    while (sentence[i] == ' ')
-    {
-        i++;
-    }
-    while (sentence[i] != ' ')
-    {
-        i++;
-    }
-    while (sentence[i] == ' ')
-    {
-        i++;
-    }
-    while (sentence[i] != ',')
-    {
-        i++;
-    }
-    i++;
-    while (sentence[i] == ' ')
-    {
-        i++;
-    }
-    int j = 0;
-    while (sentence[i] != '\0')
-    {
-        operand[j] = sentence[i];
-        i++;
-        j++;
-    }
-    return operand;
-}
+    case memoryMode8bitDisplacement:
+        strcpy(MOD, "01");
+        break;
 
-String selectOperation(String sentence)
-{
-    String operation = (String)malloc(3 * sizeof(char));
-    int i = 0;
-    while (sentence[i] == ' ')
-    {
-        i++;
-    }
-    int j = 0;
-    while (sentence[i] != ' ')
-    {
-        operation[j] = sentence[i];
-        j++;
-        i++;
-    }
-    return operation;
-}
+    case memoryMode16bitDisplacement:
+        strcpy(MOD, "10");
+        break;
 
-void checkImmidiateType(Operand *operand)
+    default:
+        break;
+    }
+
+    strcpy(reg, getRegisterCode(op2.value));
+    strcpy(rm, getRMcode(op1));
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "100010");
+    strcat(code, D);
+    strcat(code, W);
+    strcat(code, MOD);
+    strcat(code, reg);
+    strcat(code, rm);
+
+    free(W);
+    free(D);
+    free(MOD);
+    free(reg);
+    free(rm);
+    return code;
+}
+String memToreg(Operand op1, Operand op2)
 {
-    if (operand->value[strlen(operand->value) - 1] == 'h' && strlen(operand->value) > 3)
+    String W = malloc(sizeof(char) * 2);
+    String D = malloc(sizeof(char) * 2);
+    String MOD = malloc(sizeof(char) * 3);
+    String reg = malloc(sizeof(char) * 4);
+    String rm = malloc(sizeof(char) * 4);
+
+    if (op1.type.TypeDetails == sixteenBitRegister)
     {
-        operand->type.specificType = sixteenBitImmediate;
-    }
-    else if (operand->value[strlen(operand->value) - 1] == 'h')
-    {
-        operand->type.specificType = eightBitImmediate;
-    }
-    else if (atoi(operand->value) > 255)
-    {
-        operand->type.specificType = sixteenBitImmediate;
+        strcpy(W, "1");
     }
     else
     {
-        operand->type.specificType = eightBitImmediate;
+        strcpy(W, "0");
     }
+
+    strcpy(D, "1");
+
+    switch (op2.type.addressingMode)
+    {
+    case memoryModeNoDisplacement:
+        strcpy(MOD, "00");
+        break;
+
+    case memoryMode8bitDisplacement:
+        strcpy(MOD, "01");
+        break;
+
+    case memoryMode16bitDisplacement:
+        strcpy(MOD, "10");
+        break;
+
+    default:
+        break;
+    }
+
+    strcpy(reg, getRegisterCode(op1.value));
+    strcpy(rm, getRMcode(op2));
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "100010");
+    strcat(code, D);
+    strcat(code, W);
+    strcat(code, MOD);
+    strcat(code, reg);
+    strcat(code, rm);
+
+    free(W);
+    free(D);
+    free(MOD);
+    free(reg);
+    free(rm);
+    return code;
 }
-
-void checkMemoryType(Operand *operand)
+String immToRegM(Operand op1, Operand op2)
 {
-    int i = 1; // we are sure that the first character is '['
-    while (operand->value[i] != ']' && operand->value[i] != 'b' && operand->value[i] != 's' && operand->value[i] != 'd')
-    {
-        i++;
-    }
+    // we assume that the first operand is memory Type
+    String W = malloc(sizeof(char) * 2);
+    String D = malloc(sizeof(char) * 2);
+    String MOD = malloc(sizeof(char) * 3);
+    String reg = malloc(sizeof(char) * 4);
+    String rm = malloc(sizeof(char) * 4);
 
-    if (operand->value[i] == ']')
+    if (op2.type.TypeDetails == sixteenBitImmediate)
     {
-        if (operand->value[i - 1] == 'h' && strlen(operand->value) > 5)
-        {
-            operand->type.specificType = sixteenBitMemory;
-        }
-        else if (operand->value[i - 1] == 'h')
-        {
-            operand->type.specificType = eightBitMemory;
-        }
-        else if (operand->value[i - 1] != 'h')
-        {
-            String number = (String)malloc(6 * sizeof(char));
-            strncpy(number, operand->value + 1, i - 2);
-            if (atoi(number) > 255)
-            {
-                operand->type.specificType = sixteenBitMemory;
-            }
-            else
-            {
-                operand->type.specificType = eightBitMemory;
-            }
-        }
-        operand->type.moreDetails = BPorDirect;
-    }
-    else if (strstr(operand->value, "bx") != NULL && strstr(operand->value, "si") != NULL)
-    {
-        operand->type.moreDetails = BXandSI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "bx") != NULL && strstr(operand->value, "di") != NULL)
-    {
-        operand->type.moreDetails = BXandDI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "bp") != NULL && strstr(operand->value, "si") != NULL)
-    {
-        operand->type.moreDetails = BPandSI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "bp") != NULL && strstr(operand->value, "di") != NULL)
-    {
-        operand->type.moreDetails = BPandDI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "si") != NULL)
-    {
-        operand->type.moreDetails = SI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "di") != NULL)
-    {
-        operand->type.moreDetails = DI;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "bp") != NULL)
-    {
-        operand->type.moreDetails = BPorDirect;
-        operand->type.specificType = sixteenBitMemory;
-    }
-    else if (strstr(operand->value, "bx") != NULL)
-    {
-        operand->type.moreDetails = BX;
-        operand->type.specificType = sixteenBitMemory;
-    }
-}
-
-void setValue(Operand *operand, String value)
-{
-    operand->value = value;
-}
-
-void setGeneralType(Operand *operand)
-{
-    if (isOperandRegister(operand->value, registers))
-    {
-        operand->type.generalType = registerType;
-    }
-    else if (isOperandMemory(operand->value))
-    {
-        operand->type.generalType = memoryType;
-    }
-    else if (isOperandImmediate(operand->value, registers))
-    {
-        operand->type.generalType = immediateType;
-    }
-    else if (isOperandSegmentRegister(operand->value))
-    {
-        operand->type.generalType = segmentRegisterType;
-    }
-}
-
-void setSpecificType(Operand *operand)
-{
-    if (isOperandRegister(operand->value, registers))
-    {
-        if (isSEXTENbitRegister(operand->value))
-        {
-            operand->type.specificType = sixteenBitRegister;
-        }
-        else
-        {
-            operand->type.specificType = eightBitRegister;
-        }
-    }
-    else if (isOperandSegmentRegister(operand->value))
-    {
-        operand->type.specificType = segmentRegister;
-    }
-    else if (isOperandImmediate(operand->value, registers))
-    {
-        checkImmidiateType(operand);
-    }
-    else if (isOperandMemory(operand->value))
-    {
-        checkMemoryType(operand);
-    }
-}
-
-void setAddressingMode(Operand *operand)
-{
-    if (operand->type.generalType == registerType)
-    {
-        operand->type.addressingMode = registerMode;
-        return;
-    }
-
-    
-
-    if (operand->type.moreDetails == BXandSI)
-    {
-        int i = 1;
-        if(operand->value[i]!= 'b' || operand->value[i]!= 's')
-        {
-            int count = 0 ;
-            while(operand->value[i] != '+')
-            {
-                count++;
-                i++;
-            }
-            
-        }
-
-    }
-}
-
-void setMovInstructionMod(Operand *operand1, Operand *operand2, int *mode)
-{
-    if (operand1->type.generalType == registerType && operand2->type.generalType == registerType)
-    {
-        *mode = regToReg;
-    }
-    else if (operand1->type.generalType == registerType && operand2->type.generalType == memoryType)
-    {
-        *mode = memToReg;
-    }
-    else if (operand1->type.generalType == memoryType && operand2->type.generalType == registerType)
-    {
-        *mode = regToMem;
-    }
-    else if (operand1->type.generalType == registerMode && operand2->type.generalType == immediateType)
-    {
-        *mode = ImmToReg;
-    }
-    else if (operand1->type.generalType == segmentRegisterType && operand2->type.generalType == memoryType)
-    {
-        *mode = rmToSreg;
-    }
-    else if (operand1->type.generalType == memoryType && operand2->type.generalType == segmentRegisterType)
-    {
-        *mode = SregTorm;
-    }
-    else if (operand1->type.generalType == registerType && operand2->type.generalType == segmentRegisterType)
-    {
-        *mode = SregTorm;
-    }
-    else if (operand1->type.generalType == segmentRegisterType && operand2->type.generalType == registerType)
-    {
-        *mode = rmToSreg;
-    }
-    else if (operand1->type.generalType == memoryType && operand2->type.generalType == immediateType)
-    {
-        *mode = ImmToRegM;
-    }
-}
-
-void setModValue(Operand *operand1, Operand *operand2, int *mode, String *MOD)
-{
-    if (*mode == regToReg || *mode == regToMem || *mode == memToReg || *mode == SregTorm || *mode == rmToSreg)
-    {
-        if (*mode == regToReg)
-        {
-            strcpy(*MOD, "11");
-        }
+        strcpy(W, "1");
     }
     else
     {
-        strcpy(*MOD, "");
+        strcpy(W, "0");
     }
+
+    strcpy(D, "");
+
+    switch (op1.type.addressingMode)
+    {
+    case memoryModeNoDisplacement:
+        strcpy(MOD, "00");
+        break;
+
+    case memoryMode8bitDisplacement:
+        strcpy(MOD, "01");
+        break;
+
+    case memoryMode16bitDisplacement:
+        strcpy(MOD, "10");
+        break;
+
+    default:
+        break;
+    }
+
+    strcpy(reg, "000");
+    strcpy(rm, getRMcode(op1));
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "1100011");
+    strcat(code, D);
+    strcat(code, W);
+    strcat(code, MOD);
+    strcat(code, reg);
+    strcat(code, rm);
+
+    free(W);
+    free(D);
+    free(MOD);
+    free(reg);
+    free(rm);
+    return code;
+}
+String immToReg(Operand op1, Operand op2)
+{
+    String W = malloc(sizeof(char) * 2);
+    String D = malloc(sizeof(char) * 2);
+    String MOD = malloc(sizeof(char) * 3);
+    String reg = malloc(sizeof(char) * 4);
+    String rm = malloc(sizeof(char) * 4);
+
+    if (op1.type.TypeDetails == sixteenBitRegister)
+    {
+        strcpy(W, "1");
+    }
+    else
+    {
+        strcpy(W, "0");
+    }
+
+    strcpy(D, "");
+
+    strcpy(MOD, "");
+
+    strcpy(reg, getRegisterCode(op1.value));
+    strcpy(rm, "");
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "1011");
+    strcat(code, D);
+    strcat(code, W);
+    strcat(code, MOD);
+    strcat(code, reg);
+    strcat(code, rm);
+
+    free(W);
+    free(D);
+    free(MOD);
+    free(reg);
+    free(rm);
+    return code;
+}
+String memToAcc(Operand op1)
+{
+    String W = malloc(sizeof(char) * 2);
+
+    if (op1.type.TypeDetails == sixteenBitRegister)
+    {
+        strcpy(W, "1");
+    }
+    else
+    {
+        strcpy(W, "0");
+    }
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "1010000");
+    strcat(code, W);
+
+    free(W);
+    return code;
+}
+String accToMem(Operand op2)
+{
+    String W = malloc(sizeof(char) * 2);
+
+    if (op2.type.TypeDetails == sixteenBitRegister)
+    {
+        strcpy(W, "1");
+    }
+    else
+    {
+        strcpy(W, "0");
+    }
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "1010001");
+    strcat(code, W);
+
+    free(W);
+    return code;
+}
+String rmTosreg(Operand op1, Operand op2)
+{
+
+    String MOD = malloc(sizeof(char) * 3);
+    String SR = malloc(sizeof(char) * 3);
+    String rm = malloc(sizeof(char) * 4);
+
+    switch (op2.type.addressingMode)
+    {
+    case memoryModeNoDisplacement:
+        strcpy(MOD, "00");
+        break;
+
+    case memoryMode8bitDisplacement:
+        strcpy(MOD, "01");
+        break;
+
+    case memoryMode16bitDisplacement:
+        strcpy(MOD, "10");
+        break;
+
+    case registerMode:
+        strcpy(MOD, "11");
+        break;
+
+    default:
+        break;
+    }
+
+    strcpy(SR, getSregCode(op1.value));
+    strcpy(rm , op2.type.OperandType == registerType ? getRegisterCode(op2.value) : getRMcode(op2));
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "10001110");
+    strcat(code, MOD);
+    strcat(code, "0");
+    strcat(code, SR);
+    strcat(code, rm);
+
+    free(MOD);
+    free(SR);
+    free(rm);
+
+    return code;
+}
+String sregTorm(Operand op1, Operand op2)
+{
+    String MOD = malloc(sizeof(char) * 3);
+    String SR = malloc(sizeof(char) * 3);
+    String rm = malloc(sizeof(char) * 4);
+
+    switch (op1.type.addressingMode)
+    {
+    case memoryModeNoDisplacement:
+        strcpy(MOD, "00");
+        break;
+
+    case memoryMode8bitDisplacement:
+        strcpy(MOD, "01");
+        break;
+
+    case memoryMode16bitDisplacement:
+        strcpy(MOD, "10");
+        break;
+
+    case registerMode:
+        strcpy(MOD, "11");
+        break;
+
+    default:
+        break;
+    }
+
+    SR = getSregCode(op2.value);
+    rm = op1.type.OperandType == registerType ? getRegisterCode(op2.value) : getRMcode(op2);
+
+    String code = malloc(sizeof(char) * 20);
+    strcpy(code, "10001110");
+    strcat(code, MOD);
+    strcat(code, "0");
+    strcat(code, SR);
+    strcat(code, rm);
+
+    free(MOD);
+    free(SR);
+    free(rm);
+
+    return code;
 }
 
 int main()
 {
+    String operation = "MOV DS , [1234H] ";
+    Instruction instruction;
+    instruction.name = getInstructionType(operation);
+    instruction.operand1.value = getFirstOperand(operation);
+    instruction.operand2.value = getSecondOperand(operation);
 
-    printf("Enter an instruction: ");
-    String sentence = (String)malloc(100 * sizeof(char));
-    readSentence(sentence);
+    setType(&instruction.operand1);
+    setType(&instruction.operand2);
 
-    String operation = selectOperation(sentence);
-    String firstOperand = getFirstOperand(sentence);
-    String secondOperand = getSecondOperand(sentence);
+    setTypeDetails(&instruction.operand1);
+    setTypeDetails(&instruction.operand2);
 
-    Operand *operand1 = malloc(sizeof(Operand));
-    Operand *operand2 = malloc(sizeof(Operand));
+    SetAddressingMode(&instruction.operand1);
+    SetAddressingMode(&instruction.operand2);
 
-    setValue(operand1, firstOperand);
-    setValue(operand2, secondOperand);
+    setRegistersInvolvedInMemory(&instruction.operand1);
+    setRegistersInvolvedInMemory(&instruction.operand2);
 
-    setGeneralType(operand1);
-    setGeneralType(operand2);
+    setDisp(&instruction.operand1);
+    setDisp(&instruction.operand2);
 
-    setSpecificType(operand1);
-    setSpecificType(operand2);
+    setData(&instruction.operand1);
+    setData(&instruction.operand2);
 
-    setAddressingMode(operand1);
-    setAddressingMode(operand2);
+    int OperationType = setOperationType(&instruction.operand1, &instruction.operand2);
+    switch (OperationType)
+    {
+    case regToReg:
+        printf("%lX", strtol(regToreg(instruction.operand1, instruction.operand2), NULL, 2));
+        break;
+    case regToMem:
+        printf("%lX%s\n", strtol(regTomem(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand1.type.Disp);
+        break;
+    case memToReg:
+        printf("%lX%s\n", strtol(memToreg(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand2.type.Disp);
+        break;
+    case ImmToRegM:
+        printf("%lX%s%s\n", strtol(immToRegM(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand2.type.dataOrDisp, instruction.operand1.type.Disp);
+        break;
+    case ImmToReg:
+        printf("%lX%s\n", strtol(immToReg(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand2.type.dataOrDisp);
+        break;
+    case MemToAcc:
+        printf("%lX%s\n", strtol(memToAcc(instruction.operand1), NULL, 2), instruction.operand2.type.Disp);
+        break;
+    case AccToMem:
+        printf("%lX%s\n", strtol(accToMem(instruction.operand2), NULL, 2), instruction.operand1.type.Disp);
+        break;
+    case rmToSreg:
+        printf("%lX%s\n", strtol(rmTosreg(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand2.type.Disp);
+        break;
+    case SregTorm:
+        printf("%lX%s\n", strtol(sregTorm(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand1.type.Disp);
+        break;
+    default:
+        break;
+    }
 
-    printf("%d\n", operand1->type.addressingMode);
-    printf("%d\n", operand2->type.addressingMode);
 
     return 0;
 }
