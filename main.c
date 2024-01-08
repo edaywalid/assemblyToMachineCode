@@ -98,17 +98,17 @@ String eightregisters[] = {"AL", "BL", "CL", "DL", "AH", "BH", "CH", "DH"};
 String segmentRegisters[] = {"CS", "DS", "SS", "ES"};
 StringMap reg[] = {
     {"AX", "000"},
-    {"BX", "001"},
-    {"CX", "010"},
-    {"DX", "011"},
+    {"CX", "001"},
+    {"DX", "010"},
+    {"BX", "011"},
     {"AL", "000"},
-    {"BL", "001"},
-    {"CL", "010"},
-    {"DL", "011"},
+    {"CL", "001"},
+    {"DL", "010"},
+    {"BL", "011"},
     {"AH", "100"},
-    {"BH", "101"},
-    {"CH", "110"},
-    {"DH", "111"},
+    {"CH", "101"},
+    {"DH", "110"},
+    {"BH", "111"},
     {"SP", "100"},
     {"BP", "101"},
     {"SI", "110"},
@@ -1041,7 +1041,7 @@ String sregTorm(Operand op1, Operand op2)
 
 int main()
 {
-    String operation = "MOV DS , [1234H] ";
+    String operation = "MOV BL , [SI]";
     Instruction instruction;
     instruction.name = getInstructionType(operation);
     instruction.operand1.value = getFirstOperand(operation);
@@ -1090,7 +1090,7 @@ int main()
         printf("%lX%s\n", strtol(accToMem(instruction.operand2), NULL, 2), instruction.operand1.type.Disp);
         break;
     case rmToSreg:
-        printf("%lX%s\n", strtol(rmTosreg(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand2.type.Disp);
+        printf("%s%s\n", rmTosreg(instruction.operand1, instruction.operand2), instruction.operand2.type.Disp);
         break;
     case SregTorm:
         printf("%lX%s\n", strtol(sregTorm(instruction.operand1, instruction.operand2), NULL, 2), instruction.operand1.type.Disp);
