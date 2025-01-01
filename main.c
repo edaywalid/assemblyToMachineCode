@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 enum OperandType {
   registerType,
@@ -880,8 +881,29 @@ String sregTorm(Operand op1, Operand op2) {
   return code;
 }
 
-int main() {
-  String operation = "MOV BL , [SI]";
+int main(int argc, char **argv) {
+
+  int opt;
+  char *input_string = NULL;
+
+  while ((opt = getopt(argc, argv, "i:")) != -1) {
+    switch (opt) {
+    case 'i':
+      input_string = optarg;
+      break;
+    default:
+      fprintf(stderr, "Usage: %s -i \"INSTRUCTION\"\n", argv[0]);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  if (input_string == NULL) {
+    fprintf(stderr, "Error: The -i flag is required.\n");
+    fprintf(stderr, "Usage: %s -i \"INSTRUCTION\"\n", argv[0]);
+    exit(EXIT_FAILURE);
+  }
+
+  String operation = input_string;
   Instruction instruction;
   instruction.name = getInstructionType(operation);
   instruction.operand1.value = getFirstOperand(operation);
